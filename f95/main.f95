@@ -32,6 +32,7 @@ program main
      ! ---- calculate Bed change analysis    ----
      if(rtime.ge.300)then
         qbf1 = 'mpm' ; call cal_equation_of_bedloadflux_and_exner_unsteady(dep1,bl1,q1,qbf1)
+        qbf1 = 'mpm' ; call cal_equation_of_bedloadflux_and_exner_unsteady_cip(dep1,bl1,q1,qbf1)
         call cal_equation_of_M(dep2,bl2,q2,M2,lcl_m2,adv_m2)
      endif
 
@@ -444,6 +445,88 @@ subroutine cal_equation_of_bedloadflux_and_exner_unsteady(h,bl,q,qb_fml)
 !!$  write(*,*)abs(bl(iend/4,t+1) - bl(iend/4,t))/d *100
   
 end subroutine cal_equation_of_bedloadflux_and_exner_unsteady
+
+
+
+subroutine cal_equation_of_bedloadflux_and_exner_unsteady_cip(h,bl,q,qb_fml)
+  use mndr
+  character*100, intent(in) :: qb_fml
+  real*8, intent(inout)     :: h(iend,tend), bl(iend,tend), q(iend,tend)
+  real*8                    :: h_cal(iend) , h_iend       , q_cal(iend),  q_iend
+  real*8                    :: ie(iend)    , tau(iend)    , tau_iend   ,  qb(iend), qb_iend
+  
+  
+  ! ---- Calculate Depth for calculating Sheilds number and bedload discharge (i=iend, t=t+1/2) ----  
+  do i = 1, iend
+     if(i.eq.1)then
+        ! ---- Interpolate Depth of upstream boundary       (i=1   , t=t+1/2) ----
+        h_cal(i) = h(i,t) + ( ((h(i,t) + h(i+1,t) + (h(i,t+1) + h(i+1,t+1))) / 4) - h(i,t) )        
+     else
+        h_cal(i) = 1./4. * (h(i,t) + h(i,t+1) + h(i-1,t) + h(i-1,t+1) )
+     endif
+  enddo
+  
+  ! ---- Interpolate Depth of downstream boundary     (i=iend, t=t+1/2) ----
+  h_iend   = h(iend,t) + ( h_cal(iend) - ((h(iend,t) + h(iend,t+1)) / 2))
+
+  
+  ! ---- Calculate Discharge for calculating Sheilds number and bedload discharge (i=iend, t=t+1/2) ----  
+  q_cal(:) = q(:,t)
+  
+  ! ---- Interpolate discharge of downstream boundary (i=iend, t=t+1) ----
+  q_iend  = q(iend,t)   + (x(iend) - x(iend-1)) * (q(iend,t) - q(iend-1,t))     / (x(iend) - x(iend-1))
+
+
+  ! ---- Interpolate Sheilds number of downstream boundary (i=iend, t=t+1) ----
+  if(h_iend.ge.h_lim)then
+     r        = ( wdth * h_iend / (2*h_iend + wdth) )
+     tau_iend = r / (s*d) * (nb * q_iend / h_iend**(5./3.))**(2)
+  else
+     tau_iend = 0.0
+  endif
+     
+  ! ---- Calculate Sheilds number ----
+  do i = 1, iend
+     if(h_cal(i).ge.h_lim)then
+        r        = ( wdth * h_cal(i) / (2*h_cal(i) + wdth) )
+        ie(i)    = (nb * q_cal(i) / h_cal(i)**(5./3.))**(2)
+        tau(i)   = r / (s*d) * ie(i)
+     else
+        tau(i)   = 0.0
+     endif
+  enddo
+  
+  ! ---- Interpolate Sheilds number of downstream boundary (i=iend, t=t+1) ----
+  if(tau_iend.le.tauc)then
+     qb_iend = 0.0
+  elseif(trim(qb_fml).eq.'mpm')then
+     qb_iend = 8 * (tau_iend - tauc)**(3./2.) * sqrt(s*g*d**3)     
+  elseif(trim(qb_fml).eq.'amf')then
+     qb(i) = 17 * tau_iend * (1 - tau_iend / tauc) * (1 - sqrt(tau_iend / tauc)) * sqrt(s*g*d**3)
+  endif
+  
+  ! ---- Calculate Bedload discharge ----  
+  do i = 1, iend
+     if(tau(i).le.tauc)then
+        qb(i) = 0.0
+     elseif(trim(qb_fml).eq.'mpm')then
+        qb(i) = 8 * (tau(i) - tauc)**(3./2.) * sqrt(s*g*d**3)
+     elseif(trim(qb_fml).eq.'amf')then
+        qb(i) = 17 * tau(i) * (1 - tau(i) / tauc) * (1 - sqrt(tau(i) / tauc)) * sqrt(s*g*d**3)
+     endif
+  enddo
+
+  ! ---- Calculate Elevation change ----
+  do i = 1, iend
+     if(i .lt. iend)then
+        bl(i,t+1) = bl(i,t) - dt / ((1-0.6)*dx) * (qb(i+1) - qb(i))
+     else
+        bl(i,t+1) = bl(i,t) - dt / ((1-0.6)*dx) * (qb_iend - qb(i))
+     endif     
+  enddo
+!!$  write(*,*)abs(bl(iend/4,t+1) - bl(iend/4,t))/d *100
+  
+end subroutine cal_equation_of_bedloadflux_and_exner_unsteady_cip
 
 
 
