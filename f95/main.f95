@@ -3,7 +3,6 @@ program main
   use mndr
 
   intbl    =  5
-!!$  wavename = '01_1'
   wavename = '01'
 
   call set_plplot
