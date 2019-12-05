@@ -33,7 +33,7 @@ program main
      if(rtime.ge.300)then
         qbf1 = 'mpm' ; call cal_equation_of_bedloadflux_and_exner_unsteady(dep1,bl1,q1,qbf1)
         qbf1 = 'mpm' ; call cal_equation_of_bedloadflux_and_exner_unsteady_cip(dep1,bl1,q1,qbf1)
-        call cal_equation_of_M(dep2,bl2,q2,M2,lcl_m2,adv_m2)
+        call cal_equation_of_M_upwind(dep2,bl2,q2,M2,lcl_m2,adv_m2)
      endif
 
 !!$        qbf1 = 'amf' ; call cal_equation_of_bedloadflux_and_exner_unsteady(dep2,bl2,q2,qbf1)
@@ -530,7 +530,7 @@ end subroutine cal_equation_of_bedloadflux_and_exner_unsteady_cip
 
 
 
-subroutine cal_equation_of_M(h,bl,q,M,lcl_m,adv_m)
+subroutine cal_equation_of_M_upwind(h,bl,q,M,lcl_m,adv_m)
   use mndr
   real*8, intent(inout) :: h(iend,tend), bl(iend,tend), q(iend,tend), M(iend,tend), lcl_m(iend), adv_m(iend)
   real*8                :: h_cal(iend) , q_cal(iend)  , hc(iend)    , bl_cal(iend), bl_iend
@@ -598,11 +598,11 @@ subroutine cal_equation_of_M(h,bl,q,M,lcl_m,adv_m)
      endif
   enddo
   
-end subroutine cal_equation_of_M
+end subroutine cal_equation_of_M_upwind
 
 
 
-subroutine cal_equation_of_M_old(h,bl,q,M)
+subroutine cal_equation_of_M_central(h,bl,q,M)
   use mndr
   real*8, intent(inout) :: h(iend,tend), bl(iend,tend), q(iend,tend), M(iend,tend)
   real*8                :: h_cal(iend) , q_cal(iend)  , hc(iend)    , bl_cal(iend), bl_iend
@@ -639,43 +639,6 @@ subroutine cal_equation_of_M_old(h,bl,q,M)
   ! =============
   
 
-!!$  ! ==== upwind 01 ====
-!!$  do i = 1, iend
-!!$     if(i.eq.1)then
-!!$        h_cal(i) = (1./2. * (h(i,t) + h(i,t+1))) + (1./4. * (h(i,t) + h(i,t+1) + h(i+1,t) + h(i+1,t+1))) &
-!!$             - (1./2. * (h(i,t) + h(i,t+1)))
-!!$     else
-!!$        h_cal(i) = 1./4. * (h(i,t) + h(i,t+1) + h(i-1,t) + h(i-1,t+1))
-!!$     endif
-!!$  enddo
-!!$
-!!$  q_cal(:) = q(:,t)
-!!$    
-!!$  do i = 1, iend
-!!$     bl_cal(i) = (bl(i,t) + bl(i,t+1)) / 2
-!!$  enddo
-!!$
-!!$  do i = 1, iend
-!!$     hc(i) = ( q_cal(i)**(2) / g)**(1./3.)
-!!$  enddo
-!!$  ! =============
-!!$
-!!$  ! ==== upwind 02 ====
-!!$  do i = 1, iend
-!!$     if(i.eq.1)then
-!!$        h_cal(i) = h(i,t) + (h(i+1,t) - h(i,t)) / (x(i+1) - x(i)) * (x(i+1) - x(i))/2
-!!$     else
-!!$        h_cal(i) = 1./2. * (h(i,t) + h(i-1,t))
-!!$     endif
-!!$  enddo
-!!$  
-!!$  q_cal(:)  = 1./2. * (q(:,t) + q(:,t-1))
-!!$
-!!$  bl_cal(:) =  bl(:,t)
-!!$
-!!$  hc(:)     = ( q_cal(:)**(2) / g)**(1./3.)
-!!$  ! =============
-
 
   ! ---- Calculate M ----
   do i = 1, iend
@@ -708,17 +671,8 @@ subroutine cal_equation_of_M_old(h,bl,q,M)
         bl(i,t+1) = bl(i,t) - M(i,t)*dt * ( (bl_iend     - bl_cal(i)) / (x(i) - x(i-1)) + ie(i))
      endif
   enddo
-
-!!$  ! ---- Calculate Elevation change (Upwind 01 & 02) ----
-!!$  do i = 1, iend
-!!$     if(i.eq.1)then
-!!$        bl(i,t+1) = bl(i,t)
-!!$     else
-!!$        bl(i,t+1) = bl(i,t) - M(i,t)*dt * ( (bl_cal(i) - bl_cal(i-1)) / (x(i) - x(i-1)) + ie(i))
-!!$     endif
-!!$  enddo
   
-end subroutine cal_equation_of_M_old
+end subroutine cal_equation_of_M_central
 
 
 
